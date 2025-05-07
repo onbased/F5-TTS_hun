@@ -44,7 +44,7 @@ from f5_tts.infer.utils_infer import (
 
 
 DEFAULT_TTS_MODEL = "F5-TTS_v1"
-tts_model_choice = DEFAULT_TTS_MODEL
+tts_model_choice = "Custom"
 
 DEFAULT_TTS_MODEL_CFG = [
     "hf://SWivid/F5-TTS/F5TTS_v1_Base/model_1250000.safetensors",
@@ -58,7 +58,7 @@ def get_normaliser_choices():
     Scan the ./normalisers folder for subfolders that contain a normaliser.py file.
     Returns a list of possible normaliser choices.
     """
-    normaliser_path = "./normalisers"
+    normaliser_path = files("f5_tts").joinpath("infer/normalisers")
     choices = []
     if os.path.exists(normaliser_path) and os.path.isdir(normaliser_path):
         for item in os.listdir(normaliser_path):
@@ -292,9 +292,9 @@ with gr.Blocks() as app_tts:
         )
         return audio_out, spectrogram_path, ref_text_out
 
-    # Eredetileg "string" került volna átadásra a normaliser paraméternél, de azt javítjuk, 
+    # Eredetileg "string" került volna átadásra a normaliser paraméternél, de azt javítjuk,
     # és itt a komponens-objektumot (global_choose_normaliser) adjuk át:
-    # A .click call is itt lesz véglegesítve (vagy a script legvégén), 
+    # A .click call is itt lesz véglegesítve (vagy a script legvégén),
     # de a function definíció ez.
 
 
@@ -328,8 +328,8 @@ with gr.Blocks() as app_multistyle:
         """
     # Multiple Speech-Type Generation
 
-    This section allows you to generate multiple speech types or multiple people's voices. 
-    Use {StyleName} to mark up text for each voice/emotion. 
+    This section allows you to generate multiple speech types or multiple people's voices.
+    Use {StyleName} to mark up text for each voice/emotion.
     Example:
     {Regular} Hello...
     {Angry} This is unacceptable...
@@ -544,7 +544,7 @@ with gr.Blocks() as app_chat:
     gr.Markdown(
         """
 # Voice Chat
-Have a conversation with an AI using your reference voice! 
+Have a conversation with an AI using your reference voice!
 1. Upload a reference audio clip and optionally its transcript.
 2. Load the chat model.
 3. Record or type your message.
@@ -790,7 +790,11 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
             return custom
         except FileNotFoundError:
             last_used_custom.parent.mkdir(parents=True, exist_ok=True)
-            return DEFAULT_TTS_MODEL_CFG
+            return [
+                "/app/model_965000.pt",
+                "/app/vocab.txt",
+                DEFAULT_TTS_MODEL_CFG[2],
+            ]
 
     def switch_tts_model(new_choice):
         global tts_model_choice
@@ -818,14 +822,14 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
     with gr.Row():
         if not USING_SPACES:
             choose_tts_model = gr.Radio(
-                choices=[DEFAULT_TTS_MODEL, "E2-TTS", "Custom"], 
-                label="Choose TTS Model", 
-                value=DEFAULT_TTS_MODEL
+                choices=[DEFAULT_TTS_MODEL, "E2-TTS", "Custom"],
+                label="Choose TTS Model",
+                value="Custom",
             )
         else:
             choose_tts_model = gr.Radio(
-                choices=[DEFAULT_TTS_MODEL, "E2-TTS"], 
-                label="Choose TTS Model", 
+                choices=[DEFAULT_TTS_MODEL, "E2-TTS"],
+                label="Choose TTS Model",
                 value=DEFAULT_TTS_MODEL
             )
         custom_ckpt_path = gr.Dropdown(
@@ -833,14 +837,14 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
             value=load_last_used_custom()[0],
             allow_custom_value=True,
             label="Model: local_path | hf://user_id/repo_id/model_ckpt",
-            visible=False,
+            visible=True,
         )
         custom_vocab_path = gr.Dropdown(
             choices=[DEFAULT_TTS_MODEL_CFG[1]],
             value=load_last_used_custom()[1],
             allow_custom_value=True,
             label="Vocab: local_path | hf://user_id/repo_id/vocab_file",
-            visible=False,
+            visible=True,
         )
         custom_model_cfg = gr.Dropdown(
             choices=[
@@ -873,7 +877,7 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
             value=load_last_used_custom()[2],
             allow_custom_value=True,
             label="Config: in a dictionary form",
-            visible=False,
+            visible=True,
         )
 
     # Global normaliser choice
@@ -911,7 +915,7 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
         ["Basic-TTS", "Multi-Speech", "Voice-Chat", "Credits"],
     )
 
-    # -- Itt jön a végső "wire-up", vagyis a .click() hívások rögzítése 
+    # -- Itt jön a végső "wire-up", vagyis a .click() hívások rögzítése
     #    a normaliser paraméterrel (global_choose_normaliser).
 
     # 1) A Basic-TTS .click
