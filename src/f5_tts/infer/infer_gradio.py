@@ -18,6 +18,8 @@ import torchaudio
 from cached_path import cached_path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from huggingface_hub import hf_hub_download
+
 try:
     import spaces
     USING_SPACES = True
@@ -47,22 +49,21 @@ DEFAULT_TTS_MODEL = "F5-TTS_v1"
 tts_model_choice = "Custom"
 
 DEFAULT_TTS_MODEL_CFG = [
-    "hf://SWivid/F5-TTS/F5TTS_v1_Base/model_1250000.safetensors",
-    "hf://SWivid/F5-TTS/F5TTS_v1_Base/vocab.txt",
+    hf_hub_download(repo_id="SWivid/F5-TTS", filename="F5TTS_v1_Base/model_1250000.safetensors"),
+    hf_hub_download(repo_id="SWivid/F5-TTS", filename="F5TTS_v1_Base/vocab.txt"),
     json.dumps(dict(dim=1024, depth=22, heads=16, ff_mult=2, text_dim=512, conv_layers=4)),
 ]
 
-
+normalisers_path = files("f5_tts").joinpath("infer/normalisers")
 def get_normaliser_choices():
     """
     Scan the ./normalisers folder for subfolders that contain a normaliser.py file.
     Returns a list of possible normaliser choices.
     """
-    normaliser_path = files("f5_tts").joinpath("infer/normalisers")
     choices = []
-    if os.path.exists(normaliser_path) and os.path.isdir(normaliser_path):
-        for item in os.listdir(normaliser_path):
-            subdir = os.path.join(normaliser_path, item)
+    if os.path.exists(normalisers_path) and os.path.isdir(normalisers_path):
+        for item in os.listdir(normalisers_path):
+            subdir = os.path.join(normalisers_path, item)
             if os.path.isdir(subdir) and os.path.exists(os.path.join(subdir, "normaliser.py")):
                 choices.append(item)
     return choices
@@ -73,13 +74,13 @@ vocoder = load_vocoder()
 
 
 def load_f5tts():
-    ckpt_path = str(cached_path(DEFAULT_TTS_MODEL_CFG[0]))
+    ckpt_path = (DEFAULT_TTS_MODEL_CFG[0])
     F5TTS_model_cfg = json.loads(DEFAULT_TTS_MODEL_CFG[2])
     return load_model(DiT, F5TTS_model_cfg, ckpt_path)
 
 
 def load_e2tts():
-    ckpt_path = str(cached_path("hf://SWivid/E2-TTS/E2TTS_Base/model_1200000.safetensors"))
+    ckpt_path = hf_hub_download(repo_id="SWivid/E2-TTS/E2TTS_Base", filename="model_1200000.safetensors")
     E2TTS_model_cfg = dict(dim=1024, depth=24, heads=16, ff_mult=4, text_mask_padding=False, pe_attn_head=1)
     return load_model(UNetT, E2TTS_model_cfg, ckpt_path)
 
@@ -262,7 +263,7 @@ with gr.Blocks() as app_tts:
     ):
         # -- Normaliser step --
         if normaliser_choice_input != "None":
-            normaliser_file = os.path.join("normalisers", normaliser_choice_input, "normaliser.py")
+            normaliser_file = os.path.join(normalisers_path, normaliser_choice_input, "normaliser.py")
             if os.path.exists(normaliser_file):
                 import importlib.util
                 spec = importlib.util.spec_from_file_location("normaliser", normaliser_file)
@@ -459,7 +460,7 @@ with gr.Blocks() as app_multistyle:
         # If a normaliser is chosen, load it
         normaliser_module = None
         if normaliser_choice != "None":
-            normaliser_file = os.path.join("normalisers", normaliser_choice, "normaliser.py")
+            normaliser_file = os.path.join(normalisers_path, normaliser_choice, "normaliser.py")
             if os.path.exists(normaliser_file):
                 import importlib.util
                 spec = importlib.util.spec_from_file_location("normaliser", normaliser_file)
@@ -791,8 +792,8 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
         except FileNotFoundError:
             last_used_custom.parent.mkdir(parents=True, exist_ok=True)
             return [
-                "/app/model_965000.pt",
-                "/app/vocab.txt",
+                hf_hub_download(repo_id="sarpba/F5-TTS_V1_hun", filename="model_965000.pt"),
+                hf_hub_download(repo_id="sarpba/F5-TTS_V1_hun", filename="vocab.txt"),
                 DEFAULT_TTS_MODEL_CFG[2],
             ]
 
@@ -824,7 +825,7 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
             choose_tts_model = gr.Radio(
                 choices=[DEFAULT_TTS_MODEL, "E2-TTS", "Custom"],
                 label="Choose TTS Model",
-                value="Custom",
+                value=DEFAULT_TTS_MODEL,
             )
         else:
             choose_tts_model = gr.Radio(
@@ -837,14 +838,14 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
             value=load_last_used_custom()[0],
             allow_custom_value=True,
             label="Model: local_path | hf://user_id/repo_id/model_ckpt",
-            visible=True,
+            visible=False,
         )
         custom_vocab_path = gr.Dropdown(
             choices=[DEFAULT_TTS_MODEL_CFG[1]],
             value=load_last_used_custom()[1],
             allow_custom_value=True,
             label="Vocab: local_path | hf://user_id/repo_id/vocab_file",
-            visible=True,
+            visible=False,
         )
         custom_model_cfg = gr.Dropdown(
             choices=[
@@ -877,7 +878,7 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
             value=load_last_used_custom()[2],
             allow_custom_value=True,
             label="Config: in a dictionary form",
-            visible=True,
+            visible=False,
         )
 
     # Global normaliser choice
